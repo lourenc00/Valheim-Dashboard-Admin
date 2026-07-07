@@ -12,59 +12,246 @@ Tudo roda **server-side** — nenhum mod necessário nos clients.
 
 ## Índice
 
-- [Pré-requisitos](#pré-requisitos)
+- [0. Servidor Valheim (LinuxGSM)](#0-instalação-do-servidor-valheim-linuxgsm)
+- [0.B BepInEx](#0b-bepinex-para-plugins-server-side)
+- [0.C OdinEye](#0c-odineye-api-de-status)
+- [0.D Python 3](#0d-python-3-para-dashboard-e-discord-bot)
+- [0.E Mono Compiler](#0e-mono-compiler-para-build-do-admin-powers)
 - [1. Dashboard Web](#1-dashboard-web-valheim-dashboardpy)
 - [2. Discord Bot](#2-discord-bot-valheim-discordpy)
 - [3. Admin Powers Plugin](#3-admin-powers-plugin-plugincs)
 - [4. WebMap](#4-webmap)
-- [5. Iniciando o Servidor](#5-iniciando-o-servidor-com-bepinex)
 - [Port Map](#port-map)
 
 ---
 
-## Pré-requisitos
+## 0. Instalação do Servidor Valheim (LinuxGSM)
 
-### Servidor Valheim (LinuxGSM)
+### 0.1 Criar usuário dedicado
 ```bash
-# Instalar LinuxGSM
-adduser vhserver
+sudo adduser vhserver
+sudo passwd vhserver  # defina uma senha
 su - vhserver
+```
+
+### 0.2 Instalar LinuxGSM
+```bash
+# Como usuário vhserver
 wget -O linuxgsm.sh https://linuxgsm.sh
 chmod +x linuxgsm.sh
 ./linuxgsm.sh vhserver
-./vhserver install
 ```
 
-### Python 3
+### 0.3 Instalar o Valheim Server
+```bash
+./vhserver install
+```
+Durante a instalação, o LinuxGSM pergunta:
+- `Server Name`: nome do servidor (ex: "Meu Servidor")
+- `Server Password`: senha do servidor
+- `Steam user`: deixe em branco (anônimo)
+
+A instalação baixa o Valheim dedicado (~2GB) via SteamCMD para:
+```
+/home/vhserver/serverfiles/
+```
+
+### 0.4 Configurar o servidor
+
+Editar `/home/vhserver/lgsm/config-lgsm/vhserver/vhserver.cfg`:
+
+```ini
+# Configurações básicas
+servername="TENTANDO NAO MORRER"
+serverpassword="1234567@"
+port="2456"
+world="Valheim-com-amigos"
+maxplayers="10"
+
+# Parâmetros extras do servidor
+# Se quiser crossplay (jogar com Xbox/Windows Store), adicione:
+# -crossplay
+# Se quiser senha administrativa:
+# -savedir /home/vhserver/serverfiles/saves
+```
+
+### 0.5 Comandos LinuxGSM úteis
+
+| Comando | Descrição |
+|---------|-----------|
+| `./vhserver start` | Inicia o servidor |
+| `./vhserver stop` | Para o servidor |
+| `./vhserver restart` | Reinicia |
+| `./vhserver monitor` | Monitora e reinicia se cair |
+| `./vhserver console` | Abre o console interativo |
+| `./vhserver details` | Mostra informações do servidor |
+| `./vhserver update` | Atualiza o Valheim |
+| `./vhserver update-lgsm` | Atualiza o LinuxGSM |
+| `./vhserver backup` | Faz backup do mundo |
+| `./vhserver debug` | Inicia em modo debug |
+
+### 0.6 Systemd Service (recomendado)
+
+Para o servidor iniciar automaticamente com o sistema:
+
+```bash
+# Como root ou com sudo
+sudo ./vhserver install-systemd
+sudo systemctl enable vhserver
+sudo systemctl start vhserver
+```
+
+Verificar status:
+```bash
+systemctl status vhserver
+```
+
+### 0.7 Firewall
+
+```bash
+sudo ufw allow 2456/udp
+sudo ufw allow 2457/udp  # necessário para -crossplay
+sudo ufw enable
+```
+
+### 0.8 Verificar instalação
+
+```bash
+# O servidor pode levar alguns minutos para iniciar
+# Acompanhe o log:
+tail -f /home/vhserver/log/console/vhserver-console.log
+
+# Quando estiver pronto, deve aparecer:
+# "Game server connected"
+# "Game Server ID: ..."
+```
+
+### 0.9 Testar conexão
+
+- **IP do servidor**: `http://SEU_IP:2456`
+- **No jogo**: Abra o Valheim → **Join Game** → **IP connect** → digite `SEU_IP:2456` e a senha
+
+---
+
+## 0.B BepInEx (para plugins server-side)
+
+BepInEx é necessário para carregar plugins como OdinEye, Admin Powers e WebMap no servidor.
+
+### Instalação
+```bash
+cd /home/vhserver/serverfiles/
+
+# Baixar BepInEx Pack para Valheim
+wget https://valheim.thunderstore.io/package/download/denikson/BepInExPack_Valheim/5.4.2202/
+unzip 5.4.2202
+rm 5.4.2202
+```
+
+### Estrutura esperada
+```
+serverfiles/
+├── BepInEx/
+│   ├── core/
+│   │   └── 0Harmony.dll
+│   ├── plugins/
+│   │   └── (coloque os .dll dos plugins aqui)
+│   ├── config/
+│   │   └── (configurações dos plugins)
+│   └── patchers/
+├── valheim_server.x86_64
+├── start_server_bepinex.sh    ← script gerado pelo BepInEx
+└── linux64/
+    └── lib_bepinex.so
+```
+
+### Script de inicialização
+
+O BepInEx gera `start_server_bepinex.sh` com o comando correto para iniciar o servidor carregando os plugins. Edite-o se necessário:
+
+```bash
+#!/bin/bash
+export LD_LIBRARY_PATH=./linux64:$LD_LIBRARY_PATH
+export SteamAppId=892970
+
+./valheim_server.x86_64 \
+  -name "TENTANDO NAO MORRER" \
+  -port 2456 \
+  -world "Valheim-com-amigos" \
+  -password "1234567@" \
+  -crossplay \
+  -public 1 \
+  -savedir "/home/vhserver/serverfiles/saves"
+```
+
+**Importante**: O servidor DEVE ser iniciado com `start_server_bepinex.sh`, NÃO com o comando `./vhserver start` do LinuxGSM, para que os plugins carreguem.
+
+### Iniciar com tmux
+```bash
+tmux new-session -d -s vhserver './start_bepinex.sh'
+```
+
+Para anexar ao tmux e ver o console:
+```bash
+tmux attach -t vhserver
+# Para sair do tmux sem matar: Ctrl+B, D
+```
+
+---
+
+## 0.C OdinEye (API de status)
+
+OdinEye expõe uma API HTTP com informações do servidor Valheim (players, bosses, dia, etc.) na porta **4000**.
+
+### Instalação
+```bash
+# Baixar OdinEye da Thunderstore
+# Link: https://thunderstore.io/c/valheim/p/Guiraud_Olivier/OdinEye/
+# Ou via dotnet (se tiver):
+# dotnet tool install -g Thunderstore.CLI
+# thunderstore download Guiraud_Olivier/OdinEye
+
+# Copiar para os plugins do BepInEx
+cp OdinEye.dll /home/vhserver/serverfiles/BepInEx/plugins/
+```
+
+### Verificar
+```bash
+# Após iniciar o servidor com start_server_bepinex.sh:
+curl http://localhost:4000/status
+# Deve retornar JSON com informações do servidor
+```
+
+### Endpoints da OdinEye
+| Rota | Descrição |
+|------|-----------|
+| `/status` | Status geral do servidor |
+| `/players` | Lista de jogadores online |
+| `/bossDetails` | Status de derrota dos bosses |
+| `/info` | Informações do servidor (nome, versão, dia) |
+
+---
+
+## 0.D Python 3 (para Dashboard e Discord Bot)
+
 ```bash
 sudo apt update
 sudo apt install python3 python3-pip python3-venv
+
+# Opcional: criar virtualenv
+python3 -m venv /home/vhserver/venv
+source /home/vhserver/venv/bin/activate
+pip install flask requests discord.py
 ```
 
-### BepInEx (para plugins server-side)
-```bash
-# Dentro de /home/vhserver/serverfiles/
-wget https://thunderstore.io/package/download/denikson/BepInExPack_Valheim/5.4.2202/
-unzip 5.4.2202
-# A estrutura deve ficar:
-# serverfiles/
-# ├── BepInEx/
-# ├── valheim_server.x86_64
-# └── start_server_bepinex.sh
-```
+---
 
-### OdinEye (API de status do servidor)
-```bash
-# Instalar no BepInEx/plugins/
-# Download: https://thunderstore.io/c/valheim/p/Guiraud_Olivier/OdinEye/
-# Colocar OdinEye.dll em serverfiles/BepInEx/plugins/
-# OdinEye expõe HTTP em http://localhost:4000
-```
+## 0.E Mono Compiler (para build do Admin Powers)
 
-### Mono Compiler (para build do Admin Powers)
 ```bash
 sudo apt install mono-mcs
 ```
+
+Este compilador é usado apenas para compilar o plugin `AdminPowers.dll` a partir do `Plugin.cs`. Não é necessário no servidor se você já tiver a DLL pré-compilada.
 
 ---
 
@@ -416,40 +603,6 @@ Port=3000
 ### Acesso
 ```
 http://seu-servidor:3000
-```
-
----
-
-## 5. Iniciando o Servidor com BepInEx
-
-O servidor Valheim precisa ser iniciado com o script `start_server_bepinex.sh` (não pelo LinuxGSM) para carregar os plugins BepInEx.
-
-### start_bepinex.sh
-
-```bash
-#!/bin/bash
-export LD_LIBRARY_PATH=./linux64:$LD_LIBRARY_PATH
-export SteamAppId=892970
-
-./valheim_server.x86_64 \
-  -name "NOME_DO_SERVER" \
-  -port 2456 \
-  -world "NOME_DO_MUNDO" \
-  -password "SUA_SENHA" \
-  -crossplay \
-  -public 1 \
-  -savedir "/home/vhserver/serverfiles/saves"
-```
-
-### Com tmux (recomendado)
-```bash
-tmux new-session -d -s vhserver './start_bepinex.sh'
-```
-
-### Verificar se está rodando
-```bash
-# O log deve mostrar "Game server connected"
-tail -f /home/vhserver/log/console/vhserver-console.log
 ```
 
 ---
