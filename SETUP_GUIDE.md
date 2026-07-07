@@ -33,8 +33,8 @@ chmod +x linuxgsm.sh
 ```
 
 Durante a instalação:
-- Server Name: `TENTANDO NAO MORRER`
-- Password: `1234567@`
+- Server Name: `NOME_DO_SERVER`
+- Password: `SUA_SENHA`
 - Steam user: deixar vazio (anônimo)
 
 ---
@@ -107,10 +107,10 @@ Substituir valores hardcoded antes de commit:
 | O quê | Substituir por |
 |-------|---------------|
 | Token do bot | `os.environ["DISCORD_TOKEN"]` |
-| Domínio/IP `valheim.lourenc00.dev.br` | `os.environ.get("SERVER_DOMAIN", "SEU_IP")` |
-| Senha `1234567@` | `os.environ.get("SERVER_PASSWORD", "SUA_SENHA")` |
-| Guild ID `1084212416449089596` | variável ou fixo do servidor dela |
-| Channel ID `1514632321188368464` | (definido via /setchannel) |
+| Domínio/IP | `os.environ.get("SERVER_DOMAIN", "SEU_IP")` |
+| Senha do servidor | `os.environ.get("SERVER_PASSWORD", "SUA_SENHA")` |
+| Guild ID | variável ou fixo do servidor |
+| Channel ID | (definido via /setchannel) |
 
 Variáveis de ambiente necessárias na execução:
 ```bash

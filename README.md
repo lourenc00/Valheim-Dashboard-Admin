@@ -63,7 +63,7 @@ Editar `/home/vhserver/lgsm/config-lgsm/vhserver/vhserver.cfg`:
 ```ini
 # Configurações básicas
 servername="TENTANDO NAO MORRER"
-serverpassword="1234567@"
+serverpassword="SUA_SENHA"
 port="2456"
 world="Valheim-com-amigos"
 maxplayers="10"
@@ -177,7 +177,7 @@ export SteamAppId=892970
   -name "TENTANDO NAO MORRER" \
   -port 2456 \
   -world "Valheim-com-amigos" \
-  -password "1234567@" \
+  -password "SUA_SENHA" \
   -crossplay \
   -public 1 \
   -savedir "/home/vhserver/serverfiles/saves"
